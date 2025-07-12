@@ -1,3 +1,4 @@
+// commands/quote.js
 const quotes = [
     { text: "The only way to do great work is to love what you do.", author: "Steve Jobs" },
     { text: "Life is what happens when you're busy making other plans.", author: "John Lennon" },
@@ -13,10 +14,20 @@ const quotes = [
 
 module.exports = {
     name: 'quote',
-    description: 'Sends an inspirational quote',
-    aliases: ['inspire'],
-    execute(message) {
-        const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
-        message.reply(`*"${randomQuote.text}"* - ${randomQuote.author}`);
+    description: 'Sends an inspirational quote.',
+    category: 'Fun', // Added category
+    aliases: ['inspire'], // Aliases are good, messageHandler will need to support them
+    groupOnly: false, // Quotes can be sent anywhere
+    
+    // Corrected execute function signature: (client, message, args, commands)
+    async execute(client, message, args, commands) {
+        try {
+            const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
+            await message.reply(`*"${randomQuote.text}"* - ${randomQuote.author}`);
+            console.log(`[QUOTE] Sent quote to ${message.from}`);
+        } catch (error) {
+            console.error(`[QUOTE ERROR] ${error.message}`);
+            await message.reply("Failed to retrieve a quote.");
+        }
     }
 };

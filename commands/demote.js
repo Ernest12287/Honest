@@ -1,8 +1,15 @@
-const demoteHandler = require('../lib/demoteHandler');
+// commands/demote.js
+const demoteHandler = require('../lib/demoteHandler'); // Path relative to commands/demote.js
 
-module.exports = async (client, message) => {
-    await demoteHandler(client, message);
+module.exports = {
+    name: 'demote',
+    description: 'Demotes a user from admin in the group. Usage: !demote @user',
+    category: 'Group',
+    groupOnly: true, // Demoting is typically a group admin action
+    
+    // The execute function receives `commands` (the loaded command map) from messageHandler.js
+    async execute(client, message, args, commands) {
+        // Call your existing demoteHandler, passing client and message.
+        await demoteHandler(client, message); 
+    }
 };
-
-module.exports.category = "Group";
-module.exports.description = "Demote a user from admin in the group";
