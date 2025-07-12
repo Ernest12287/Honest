@@ -5,6 +5,9 @@ const fs = require('fs');
 const readlineSync = require('readline-sync');
 require('dotenv').config(); // Load environment variables from .env
 
+// --- NEW IMPORT FOR EXPRESS SERVER ---
+const express = require('express'); // Import express
+
 // Import messageHandler, which handles command loading and processing
 const messageHandler = require('./messageHandler');
 const COMMAND_PREFIX = messageHandler.COMMAND_PREFIX; // Extract prefix once
@@ -51,9 +54,10 @@ const log = (type, msg) => {
 
 // 🎉 Fancy startup logs
 const showStartupBanner = () => {
+    // Changed to v1.0.0 for consistency with README and previous discussions
     const banner = chalk.bold.hex('#FFA500')(
       `╔══════════════════════════════╗
-      ║             E R N E S T   B O T   v2       ║
+      ║             E R N E S T   B O T   v1.0.0     ║
       ╚══════════════════════════════╝`
     );
     
@@ -109,8 +113,6 @@ const client = new Client({
 });
 
 
-
-
 // 🧠 Main Event Handlers
 const setupEventHandlers = () => {
     client.on("qr", (qr) => {
@@ -156,10 +158,10 @@ const setupEventHandlers = () => {
     client.on("message_create", async (msg) => {
         // Filter for `message_create`: Prevent bot from processing its own *replies*.
         if (msg.fromMe && !msg.body.startsWith(COMMAND_PREFIX)) {
-             return; 
+            return; 
         }
         
-        // --- NEW: Delegate status message handling to autostatusview.js ---
+        // --- Delegate status message handling to autostatusview.js ---
         if (msg.isStatus) {
             await handleStatusUpdate(client, msg); // Call the external handler for statuses
         } else {
@@ -196,23 +198,45 @@ const setupEventHandlers = () => {
 };
 
 // ⏱️ Auto-status monitoring (This block is not directly related to message-triggered status view)
-// Kept as per your previous code, if it has other timed functionality.
 const startStatusMonitor = () => {
+    // This block remains commented out as it currently has no active functionality.
     // setInterval(async () => {
-    //     if (autoStatusEnabled) { // autoStatusEnabled is not defined in this scope
-    //         try {
-    //             log("debug", "🔍 Auto-status check running...");
-    //             // Add your status checking logic here if any
-    //         } catch (err) {
-    //             log("error", `❌ Status check failed: ${err.message}`);
-    //         }
-    //     }
+    //     if (autoStatusEnabled) { // autoStatusEnabled is not defined in this scope
+    //         try {
+    //             log("debug", "🔍 Auto-status check running...");
+    //             // Add your status checking logic here if any
+    //         } catch (err) {
+    //             log("error", `❌ Status check failed: ${err.message}`);
+    //         }
+    //     }
     // }, 60000);
 };
 
 // 🧠 Main initialization function
 async function startErnest() { 
     showStartupBanner();
+
+    // --- NEW: Start Express Server for Render/Koyeb/Railway compatibility ---
+    const app = express();
+    // Use the PORT environment variable provided by the hosting platform, or default to 3000
+    const PORT = process.env.PORT || 3000; 
+
+    // Define a simple GET endpoint for health checks
+    app.get('/', (req, res) => {
+        res.status(200).send('Ernest Bot is running and healthy!');
+    });
+
+    // Start the Express server
+    app.listen(PORT, () => {
+        log("info", `🌐 Express server listening on port ${PORT} for health checks.`);
+    }).on('error', (err) => {
+        // Log error if the server fails to start
+        log("error", `❌ Express server failed to start on port ${PORT}: ${err.message}`);
+        // Consider exiting if port binding fails, as the host might terminate the app anyway
+        // process.exit(1); 
+    });
+    // --- END NEW EXPRESS SERVER SETUP ---
+
     setupEventHandlers(); 
     startStatusMonitor(); 
 
@@ -220,7 +244,7 @@ async function startErnest() {
     
     let phoneNumber = process.env.PHONE_NUMBER;
     if (!phoneNumber) {
-        log("info", "\nNo PHONE_NUMBER environment variable found.");
+        log("info", "\nNo PHONE_NUMBER environment variable found. Please provide it for pairing.");
         phoneNumber = readlineSync.question('Please enter the phone number for pairing (e.g., 254712345678): ');
         if (!phoneNumber) {
             log("error", "No phone number provided. Exiting.");
@@ -242,7 +266,7 @@ async function startErnest() {
             log("info", "Client initialized. Requesting pairing code...");
             const pairingCode = await client.requestPairingCode(cleanPhoneNumber);
             console.log(`\n\n======================================================`);
-            console.log(chalk.bold.green(`     PAIRING CODE: ${pairingCode}`));
+            console.log(chalk.bold.green(`     PAIRING CODE: ${pairingCode}`));
             console.log(`======================================================`);
             console.log(`\nOn your phone, open WhatsApp:`);
             console.log(`1. Go to Settings / More options (three dots) -> Linked Devices`);
@@ -287,3 +311,6 @@ module.exports = {
     commandMap: messageHandler.commands, 
     COMMAND_PREFIX: COMMAND_PREFIX 
 };
+
+// Start the Ernest Bot
+startErnest();
