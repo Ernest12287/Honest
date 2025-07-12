@@ -309,5 +309,3 @@ module.exports = {
     COMMAND_PREFIX: COMMAND_PREFIX 
 };
 
-// Start the Ernest Bot
-startErnest();
