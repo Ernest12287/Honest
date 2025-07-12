@@ -2,7 +2,7 @@
 const { Client, LocalAuth } = require("whatsapp-web.js");
 const path = require('path');
 const fs = require('fs');
-const readlineSync = require('readline-sync');
+// const readlineSync = require('readline-sync'); // REMOVED: Not suitable for cloud environments
 require('dotenv').config(); // Load environment variables from .env
 
 // --- NEW IMPORT FOR EXPRESS SERVER ---
@@ -34,12 +34,12 @@ const log = (type, msg) => {
         event: { color: chalk.magenta, label: "[EVENT]", border: "magenta" },
         debug: { color: chalk.cyan, label: "[DEBUG]", border: "cyan" }
     };
-    
+
     const style = colors[type.toLowerCase()] || { color: chalk.white, label: "[LOG]", border: "white" };
 
     // Format timestamp for consistent output
     const stamp = `[${new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}]`;
-    
+
     const boxOptions = {
         padding: 1,
         margin: 1,
@@ -47,20 +47,19 @@ const log = (type, msg) => {
         borderColor: style.border,
         backgroundColor: '#1a1a1a'
     };
-    
+
     const content = `${stamp} ${style.color(style.label)} ${msg}`;
     console.log(boxen(content, boxOptions));
 };
 
 // 🎉 Fancy startup logs
 const showStartupBanner = () => {
-    // Changed to v1.0.0 for consistency with README and previous discussions
     const banner = chalk.bold.hex('#FFA500')(
       `╔══════════════════════════════╗
       ║             E R N E S T   B O T   v1.0.0     ║
       ╚══════════════════════════════╝`
     );
-    
+
     const box = boxen(banner, {
       padding: 1,
       margin: 1,
@@ -68,7 +67,7 @@ const showStartupBanner = () => {
       borderColor: 'yellow',
       backgroundColor: '#1a1a1a'
     });
-    
+
     console.log(box);
     log("event", "Initializing Ernest...");
     log("debug", "Checking system dependencies...");
@@ -123,7 +122,7 @@ const setupEventHandlers = () => {
         log("ready", chalk.bold.green("🚀 ERNEST IS NOW OPERATIONAL!"));
         log("info", "📊 All systems green. Awaiting commands...");
         log("debug", `📦 Loaded ${Object.keys(messageHandler.commands).length} commands`);
-        
+
         try {
             const info = await client.info;
             log("info", `Connected as: ${info.pushname} (${info.wid.user})`);
@@ -154,18 +153,14 @@ const setupEventHandlers = () => {
     });
 
     // --- Message Event Handler ---
-    // 'message_create' event: Captures ALL messages (sent by self, or received).
     client.on("message_create", async (msg) => {
-        // Filter for `message_create`: Prevent bot from processing its own *replies*.
         if (msg.fromMe && !msg.body.startsWith(COMMAND_PREFIX)) {
             return; 
         }
-        
-        // --- Delegate status message handling to autostatusview.js ---
+
         if (msg.isStatus) {
-            await handleStatusUpdate(client, msg); // Call the external handler for statuses
+            await handleStatusUpdate(client, msg); 
         } else {
-            // For all other messages (non-status, from others, or commands from linked phone), pass to handler.
             messageHandler.processIncomingMessage(client, msg);
         }
     });
@@ -197,95 +192,97 @@ const setupEventHandlers = () => {
     });
 };
 
-// ⏱️ Auto-status monitoring (This block is not directly related to message-triggered status view)
 const startStatusMonitor = () => {
-    // This block remains commented out as it currently has no active functionality.
-    // setInterval(async () => {
-    //     if (autoStatusEnabled) { // autoStatusEnabled is not defined in this scope
-    //         try {
-    //             log("debug", "🔍 Auto-status check running...");
-    //             // Add your status checking logic here if any
-    //         } catch (err) {
-    //             log("error", `❌ Status check failed: ${err.message}`);
-    //         }
-    //     }
-    // }, 60000);
+    // (Block intentionally empty, or contains other scheduled tasks)
 };
 
 // 🧠 Main initialization function
 async function startErnest() { 
     showStartupBanner();
 
-    // --- NEW: Start Express Server for Render/Koyeb/Railway compatibility ---
     const app = express();
-    // Use the PORT environment variable provided by the hosting platform, or default to 3000
     const PORT = process.env.PORT || 3000; 
 
-    // Define a simple GET endpoint for health checks
     app.get('/', (req, res) => {
         res.status(200).send('Ernest Bot is running and healthy!');
     });
 
-    // Start the Express server
     app.listen(PORT, () => {
         log("info", `🌐 Express server listening on port ${PORT} for health checks.`);
     }).on('error', (err) => {
-        // Log error if the server fails to start
         log("error", `❌ Express server failed to start on port ${PORT}: ${err.message}`);
-        // Consider exiting if port binding fails, as the host might terminate the app anyway
-        // process.exit(1); 
+        process.exit(1); 
     });
-    // --- END NEW EXPRESS SERVER SETUP ---
 
     setupEventHandlers(); 
     startStatusMonitor(); 
 
     log("info", "⚡ Initializing WhatsApp client...");
-    
+
     let phoneNumber = process.env.PHONE_NUMBER;
     if (!phoneNumber) {
-        log("info", "\nNo PHONE_NUMBER environment variable found. Please provide it for pairing.");
-        phoneNumber = readlineSync.question('Please enter the phone number for pairing (e.g., 254712345678): ');
-        if (!phoneNumber) {
-            log("error", "No phone number provided. Exiting.");
-            process.exit(1);
-        }
+        log("error", "PHONE_NUMBER environment variable is not set. This is required for cloud deployments.");
+        log("error", "Please set PHONE_NUMBER in your Render environment variables (e.g., 254712345678, no '+' or spaces).");
+        process.exit(1); 
     }
-    const cleanPhoneNumber = phoneNumber.replace(/\D/g, '');
-    if (cleanPhoneNumber.length < 9) {
-        log("error", "Invalid phone number format. Please ensure it's a full international number (e.g., 254712345678). Exiting.");
+
+    const cleanPhoneNumber = phoneNumber.replace(/\D/g, ''); 
+    if (cleanPhoneNumber.length < 9) { 
+        log("error", "Invalid PHONE_NUMBER format. Please ensure it's a full international number (e.g., 254712345678) without '+' or spaces. Exiting.");
         process.exit(1);
     }
-    
+
     const hasExistingSession = fs.existsSync(path.join(SESSION_DATA_PATH, `session-${SESSION_NAME}`));
 
     if (!hasExistingSession) {
-        log("info", `No existing session found at "${SESSION_DATA_PATH}". Attempting to authenticate...`);
+        log("info", `No existing session found at "${SESSION_DATA_PATH}". Attempting to authenticate via pairing code...`);
         try {
+            // --- ADDED DEBUG LOGS HERE ---
+            log("debug", "Starting client.initialize() for first-time authentication. This may take a moment...");
             await client.initialize();
-            log("info", "Client initialized. Requesting pairing code...");
+            log("debug", "client.initialize() completed. Requesting pairing code...");
             const pairingCode = await client.requestPairingCode(cleanPhoneNumber);
+            log("debug", "Pairing code received. Displaying in logs now.");
+
+            // --- Make pairing code highly visible in Render logs ---
             console.log(`\n\n======================================================`);
-            console.log(chalk.bold.green(`     PAIRING CODE: ${pairingCode}`));
-            console.log(`======================================================`);
-            console.log(`\nOn your phone, open WhatsApp:`);
-            console.log(`1. Go to Settings / More options (three dots) -> Linked Devices`);
-            console.log(`2. Tap "Link a Device"`);
-            console.log(`3. Tap "Link with phone number" (usually at the bottom)`);
-            console.log(`4. Enter the 8-character code: ${pairingCode}\n`);
-            console.log("Waiting for pairing to complete...");
+            console.log(chalk.bold.hex('#FFD700')(`                     🔥 PAIRING CODE GENERATED 🔥`));
+            console.log(chalk.bold.greenBright(`                             ${pairingCode}`)); // Highlight the code itself
+            console.log(chalk.bold.hex('#FFD700')(`======================================================`));
+            console.log(`\n**ACTION REQUIRED ON YOUR PHONE:**`);
+            console.log(`1. Open WhatsApp.`);
+            console.log(`2. Go to Settings / More options (three dots) -> Linked Devices.`);
+            console.log(`3. Tap "Link a Device".`);
+            console.log(`4. Tap "Link with phone number" (usually at the bottom).`);
+            console.log(`5. Enter the 8-character code: ${pairingCode}`);
+            console.log(`\n(This bot process will remain running and wait for you to link. Once linked, the session will be saved automatically.)`);
+
         } catch (error) {
-            log("error", "Error during initial client initialization or pairing code request: " + error.message);
-            log("error", "This might indicate an issue with the pairing code method or your phone number format.");
-            log("error", "Please ensure your phone is online and has an active WhatsApp connection.");
+            // --- ADDED DETAILED ERROR LOGGING HERE ---
+            log("error", "ERROR during WhatsApp client initialization or pairing code request:");
+            log("error", `Message: ${error.message}`);
+            log("error", `Name: ${error.name}`); // Often gives more specific error type
+            log("error", `Stack: \n${error.stack}`); // Print full stack trace for debugging
+            log("error", "This might indicate an issue with Puppeteer (Chromium) launch, missing system dependencies, or resource constraints.");
+            log("error", "Please ensure your PHONE_NUMBER environment variable is correct and your phone is online with an active WhatsApp connection. Exiting for restart.");
+            process.exit(1); 
         }
     } else {
         log("info", `Existing session found at "${SESSION_DATA_PATH}". Attempting to restore session...`);
-        client.initialize()
-            .catch(err => {
-                log("error", "Failed to initialize client with existing session: " + err.message);
-                log("error", "Session might be corrupted or outdated. Please try deleting the session folder and restarting.");
-            });
+        try {
+            // --- ADDED DEBUG LOGS HERE ---
+            log("debug", "Starting client.initialize() for session restoration. This may take a moment...");
+            await client.initialize();
+            log("debug", "Session restoration completed successfully.");
+        } catch (err) {
+            // --- ADDED DETAILED ERROR LOGGING HERE ---
+            log("error", "ERROR during WhatsApp client session restoration:");
+            log("error", `Message: ${err.message}`);
+            log("error", `Name: ${err.name}`);
+            log("error", `Stack: \n${err.stack}`); // Print full stack trace
+            log("error", "Session might be corrupted or outdated, or Puppeteer failed to launch. Please try deleting the session folder on Render (if possible via shell) or locally, then redeploy.");
+            process.exit(1); 
+        }
     }
 
     process.on('SIGINT', async () => {
