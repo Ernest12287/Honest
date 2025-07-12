@@ -20,7 +20,7 @@
   "main": "ernest.js",
   "scripts": {
     "start": "node ernestexecute.js",
-    "postinstall": " npx puppeteer install",
+    "build": "npx puppeteer install",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
